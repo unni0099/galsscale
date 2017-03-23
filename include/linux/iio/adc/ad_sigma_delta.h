@@ -78,6 +78,42 @@ struct ad_sigma_delta {
 	uint8_t				data[4] ____cacheline_aligned;
 };
 
+
+
+// ************************************************************************
+// these are the private structure to the ads1292 adc
+struct ads1292r_chip_info {
+        unsigned int id;
+        const struct iio_chan_spec *channels;
+        unsigned int num_channels;
+        unsigned int flags;
+
+        const struct iio_info *iio_info;
+        const u16 *sample_freq_avail;
+};
+
+struct ads1292r_state {
+        const struct ads1292r_chip_info *chip_info;
+        struct regulator                *reg;
+        u16                             int_vref_mv;
+        u16                             mode;
+        u16                             conf;
+        u32                             scale_avail[8][2];
+        u16                             freq_mode;
+        u16                             gain;
+        uint8_t                         data_buffer[9];
+        struct gpio_desc                *ste_gpio;
+        struct gpio_desc                *start_gpio;
+        struct gpio_desc                *data_ready;
+        struct gpio_desc                *reset_gpio;
+        struct ad_sigma_delta           sd;
+        int                             irq;
+
+};
+
+
+void ads1292r_event_handler(int irq, void *data);
+//***************************************************************************
 static inline int ad_sigma_delta_set_channel(struct ad_sigma_delta *sd,
 	unsigned int channel)
 {

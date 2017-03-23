@@ -271,7 +271,7 @@ static int wl1271_probe(struct sdio_func *func,
 	int ret = -ENOMEM;
 	int irq;
 	const char *chip_family;
-
+	printk(KERN_ALERT "**************** WL1271 PROBE \n");
 	/* We are only able to handle the wlan function */
 	if (func->num != 0x02)
 		return -ENODEV;

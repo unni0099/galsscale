@@ -320,6 +320,10 @@
 				};
 
 				ecspi1: ecspi@02008000 {
+					fsl,spi-num-chipselects = <1>;
+					cs-gpios = <0>;
+					spi-cpha;
+					clock-frequency = <512000>;
 					#address-cells = <1>;
 					#size-cells = <0>;
 					compatible = "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
@@ -1417,15 +1421,20 @@
 			};
 
 			ecspi5: ecspi@0228c000 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-				compatible = "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
-				reg = <0x0228c000 0x4000>;
-				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&clks IMX6SX_CLK_ECSPI5>,
-					 <&clks IMX6SX_CLK_ECSPI5>;
-				clock-names = "ipg", "per";
-				status = "disabled";
+				fsl,spi-num-chipselects = <1>;
+                                //cs-gpios = <&gpio4 28 0>; 
+                                cs-gpios = <0>;
+                                spi-cpha;
+                                #address-cells = <1>;
+                                #size-cells = <0>;
+                                compatible = "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
+                                reg = <0x0228c000 0x4000>;
+                                interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+                                clocks = <&clks IMX6SX_CLK_ECSPI5>,
+                                         <&clks IMX6SX_CLK_ECSPI5>;
+                                clock-names = "ipg", "per";
+                                status = "okay";
+
 			};
 
 			sema4: sema4@02290000 { /* sema4 */

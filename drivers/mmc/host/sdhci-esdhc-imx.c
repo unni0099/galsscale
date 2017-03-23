@@ -692,6 +692,11 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
 	int pre_div = 2;
 	int div = 1;
 	u32 temp, val;
+	struct mmc_host *mmc;
+        mmc = host->mmc;
+        char *var = "mmc2";
+        
+       char *var2 = mmc_hostname(mmc);
 
 	if (clock == 0) {
 		host->mmc->actual_clock = 0;
@@ -711,7 +716,12 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
 	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
 		| ESDHC_CLOCK_MASK);
 	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
-
+	if(!memcmp((char *)var,var2,5))
+        {
+                //pre_div = 32;
+                //div =3;
+               clock = 1000000;
+        }
 	if (imx_data->socdata->flags & ESDHC_FLAG_ERR010450) {
 		if (imx_data->is_ddr)
 			clock = clock > 45000000 ? 45000000 : clock;
@@ -1391,7 +1401,11 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
 	int ret;
-
+        struct mmc_host *mmc;
+        mmc = host->mmc;
+        char *var = "mmc2";
+        char *var2 = mmc_hostname(mmc);
+        if(memcmp((char *)var,var2,5)){
 	ret = sdhci_runtime_suspend_host(host);
 
 	if (!sdhci_sdio_irq_enabled(host)) {
@@ -1401,8 +1415,9 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
 	clk_disable_unprepare(imx_data->clk_ahb);
 
 	release_bus_freq(BUS_FREQ_HIGH);
-
 	return ret;
+	}
+	return 0;
 }
 
 static int sdhci_esdhc_runtime_resume(struct device *dev)
@@ -1410,7 +1425,11 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-
+	struct mmc_host *mmc;
+        mmc = host->mmc;
+        char *var = "mmc2";
+        char *var2 = mmc_hostname(mmc);
+        if(memcmp((char *)var,var2,5)){
 	request_bus_freq(BUS_FREQ_HIGH);
 
 	if (!sdhci_sdio_irq_enabled(host)) {
@@ -1420,6 +1439,8 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
 	clk_prepare_enable(imx_data->clk_ahb);
 
 	return sdhci_runtime_resume_host(host);
+        }
+	return 0;
 }
 #endif
 

@@ -14,6 +14,7 @@
 #include <linux/spi/spi.h>
 #include <linux/err.h>
 #include <linux/module.h>
+#include <linux/delay.h> 
 
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -29,7 +30,7 @@
 #define AD_SD_COMM_CHAN_MASK	0x3
 
 #define AD_SD_REG_COMM		0x00
-#define AD_SD_REG_DATA		0x03
+#define AD_SD_REG_DATA		0x00
 
 /**
  * ad_sd_set_comm() - Set communications register
@@ -37,6 +38,7 @@
  * @sigma_delta: The sigma delta device
  * @comm: New value for the communications register
  */
+extern bool  conversion_complete; 
 void ad_sd_set_comm(struct ad_sigma_delta *sigma_delta, uint8_t comm)
 {
 	/* Some variants use the lower two bits of the communications register
@@ -67,8 +69,9 @@ int ad_sd_write_reg(struct ad_sigma_delta *sigma_delta, unsigned int reg,
 	struct spi_message m;
 	int ret;
 
-	data[0] = (reg << sigma_delta->info->addr_shift) | sigma_delta->comm;
+	data[0] = reg&0x1f;//(reg << sigma_delta->info->addr_shift) | sigma_delta->comm;
 
+	printk(KERN_ALERT "writing to the reg %d value %d size =%d   \n",reg,val,size);
 	switch (size) {
 	case 3:
 		data[1] = val >> 16;
@@ -119,16 +122,20 @@ static int ad_sd_read_reg_raw(struct ad_sigma_delta *sigma_delta,
 	spi_message_init(&m);
 
 	if (sigma_delta->info->has_registers) {
-		data[0] = reg << sigma_delta->info->addr_shift;
-		data[0] |= sigma_delta->info->read_mask;
+		//data[0] = reg << sigma_delta->info->addr_shift;
+		//data[0] |= sigma_delta->info->read_mask;
+		data[0] = reg&0x1f;
+                data[0] |= 0x20;
+                printk(KERN_ALERT " *****REG IS %d \n",data[0]);
 		spi_message_add_tail(&t[0], &m);
 	}
 	spi_message_add_tail(&t[1], &m);
-
+	printk(KERN_ALERT "****VALUE = %x %x \n",*val,val[1]);
 	if (sigma_delta->bus_locked)
 		ret = spi_sync_locked(sigma_delta->spi, &m);
 	else
 		ret = spi_sync(sigma_delta->spi, &m);
+	printk(KERN_ALERT "****VALUE = %x %x size = %x\n",*val,val[1],size);
 
 	return ret;
 }
@@ -196,7 +203,7 @@ static int ad_sd_calibrate(struct ad_sigma_delta *sigma_delta,
 
 	sigma_delta->irq_dis = false;
 	enable_irq(sigma_delta->spi->irq);
-	ret = wait_for_completion_timeout(&sigma_delta->completion, 2*HZ);
+	ret = wait_for_completion_timeout(&sigma_delta->completion, HZ);
 	if (ret == 0) {
 		sigma_delta->irq_dis = true;
 		disable_irq_nosync(sigma_delta->spi->irq);
@@ -262,11 +269,10 @@ int ad_sigma_delta_single_conversion(struct iio_dev *indio_dev,
 	reinit_completion(&sigma_delta->completion);
 
 	ad_sigma_delta_set_mode(sigma_delta, AD_SD_MODE_SINGLE);
-
 	sigma_delta->irq_dis = false;
 	enable_irq(sigma_delta->spi->irq);
 	ret = wait_for_completion_interruptible_timeout(
-			&sigma_delta->completion, HZ);
+			&sigma_delta->completion, 4*HZ);
 
 	sigma_delta->bus_locked = false;
 	spi_bus_unlock(sigma_delta->spi->master);
@@ -275,7 +281,6 @@ int ad_sigma_delta_single_conversion(struct iio_dev *indio_dev,
 		ret = -EIO;
 	if (ret < 0)
 		goto out;
-
 	ret = ad_sd_read_reg(sigma_delta, AD_SD_REG_DATA,
 		DIV_ROUND_UP(chan->scan_type.realbits + chan->scan_type.shift, 8),
 		&raw_sample);
@@ -364,8 +369,11 @@ static irqreturn_t ad_sd_trigger_handler(int irq, void *p)
 	struct ad_sigma_delta *sigma_delta = iio_device_get_drvdata(indio_dev);
 	unsigned int reg_size;
 	uint8_t data[16];
-	int ret;
+	char *var = "afe4300";
+	int ret;	
+	struct ads1292r_state *st = iio_priv(indio_dev);
 
+	if(!memcmp(var,indio_dev->name,8)) {
 	memset(data, 0x00, 16);
 
 	reg_size = indio_dev->channels[0].scan_type.realbits +
@@ -386,7 +394,12 @@ static irqreturn_t ad_sd_trigger_handler(int irq, void *p)
 			reg_size, &data[1]);
 		break;
 	}
-
+	}
+	else {
+		ads1292r_event_handler(irq,indio_dev);	
+		memset(data, 0x00, 16);
+		memcpy(data,st->data_buffer,9);
+        }
 	iio_push_to_buffers_with_timestamp(indio_dev, data, pf->timestamp);
 
 	iio_trigger_notify_done(indio_dev->trig);
@@ -406,12 +419,12 @@ static const struct iio_buffer_setup_ops ad_sd_buffer_setup_ops = {
 static irqreturn_t ad_sd_data_rdy_trig_poll(int irq, void *private)
 {
 	struct ad_sigma_delta *sigma_delta = private;
-
-	complete(&sigma_delta->completion);
+	printk(KERN_ALERT "\n irqued \n");
 	disable_irq_nosync(irq);
 	sigma_delta->irq_dis = true;
+	conversion_complete = true; 
+	complete(&sigma_delta->completion);
 	iio_trigger_poll(sigma_delta->trig);
-
 	return IRQ_HANDLED;
 }
 
@@ -442,7 +455,8 @@ static int ad_sd_probe_trigger(struct iio_dev *indio_dev)
 {
 	struct ad_sigma_delta *sigma_delta = iio_device_get_drvdata(indio_dev);
 	int ret;
-
+	
+	char *var = "afe4300";
 	sigma_delta->trig = iio_trigger_alloc("%s-dev%d", indio_dev->name,
 						indio_dev->id);
 	if (sigma_delta->trig == NULL) {
@@ -451,12 +465,21 @@ static int ad_sd_probe_trigger(struct iio_dev *indio_dev)
 	}
 	sigma_delta->trig->ops = &ad_sd_trigger_ops;
 	init_completion(&sigma_delta->completion);
-
-	ret = request_irq(sigma_delta->spi->irq,
+	
+	if(!memcmp(var,indio_dev->name,8)) {
+		ret = request_irq(sigma_delta->spi->irq,
 			  ad_sd_data_rdy_trig_poll,
-			  IRQF_TRIGGER_LOW,
+			  IRQF_TRIGGER_LOW ,
 			  indio_dev->name,
 			  sigma_delta);
+	}
+	else {
+		ret = request_irq(sigma_delta->spi->irq,
+			  ad_sd_data_rdy_trig_poll,
+			  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+			  indio_dev->name,
+			  sigma_delta);
+	}
 	if (ret)
 		goto error_free_trig;
 

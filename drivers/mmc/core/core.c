@@ -1309,8 +1309,6 @@ int mmc_of_parse_voltage(struct device_node *np, u32 *mask)
 }
 EXPORT_SYMBOL(mmc_of_parse_voltage);
 
-#endif /* CONFIG_OF */
-
 static int mmc_of_get_func_num(struct device_node *node)
 {
 	u32 reg;
@@ -1338,6 +1336,10 @@ struct device_node *mmc_of_find_child_device(struct mmc_host *host,
 
 	return NULL;
 }
+
+#endif /* CONFIG_OF */
+
+
 
 #ifdef CONFIG_REGULATOR
 

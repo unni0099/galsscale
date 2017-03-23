@@ -178,7 +178,10 @@ static void sdhci_disable_card_detection(struct sdhci_host *host)
 void sdhci_reset(struct sdhci_host *host, u8 mask)
 {
 	unsigned long timeout;
-
+        struct mmc_host *mmc = host->mmc;
+        char *var = "mmc2";
+        char *var2 = mmc_hostname(mmc);
+        if(memcmp((char *)var,var2,5)) {  
 	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
 
 	if (mask & SDHCI_RESET_ALL) {
@@ -202,6 +205,7 @@ void sdhci_reset(struct sdhci_host *host, u8 mask)
 		timeout--;
 		mdelay(1);
 	}
+      }
 }
 EXPORT_SYMBOL_GPL(sdhci_reset);
 
@@ -228,7 +232,13 @@ static void sdhci_do_reset(struct sdhci_host *host, u8 mask)
 static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
 
 static void sdhci_init(struct sdhci_host *host, int soft)
-{
+{	
+	struct mmc_host *mmc;
+        mmc = host->mmc;
+        char *var = "mmc2";
+        char *var2 = mmc_hostname(mmc);
+        if(memcmp((char *)var,var2,5)){
+
 	if (soft)
 		sdhci_do_reset(host, SDHCI_RESET_CMD|SDHCI_RESET_DATA);
 	else
@@ -251,6 +261,7 @@ static void sdhci_init(struct sdhci_host *host, int soft)
 		host->clock = 0;
 		sdhci_set_ios(host->mmc, &host->mmc->ios);
 	}
+        }
 }
 
 static void sdhci_reinit(struct sdhci_host *host)
@@ -1444,6 +1455,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 	unsigned long flags;
 	u8 ctrl;
 	struct mmc_host *mmc = host->mmc;
+        char *var = "mmc2";
+        char *var2 = mmc_hostname(mmc);
 
 	spin_lock_irqsave(&host->lock, flags);
 
@@ -1460,15 +1473,17 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 	 * Should clear out any weird states.
 	 */
 	if (ios->power_mode == MMC_POWER_OFF) {
-		sdhci_writel(host, 0, SDHCI_SIGNAL_ENABLE);
-		sdhci_reinit(host);
+		if(memcmp((char *)var,var2,5)) {
+			sdhci_writel(host, 0, SDHCI_SIGNAL_ENABLE);
+			sdhci_reinit(host);
+		}
 	}
 
 	if (host->version >= SDHCI_SPEC_300 &&
 		(ios->power_mode == MMC_POWER_UP) &&
 		!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN))
 		sdhci_enable_preset_value(host, false);
-
+	if((memcmp((char *)var,var2,5)) || (ios->power_mode !=0)) {
 	if (!ios->clock || ios->clock != host->clock) {
 		host->ops->set_clock(host, ios->clock);
 		host->clock = ios->clock;
@@ -1485,6 +1500,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 			host->mmc->max_busy_timeout /= host->timeout_clk;
 		}
 	}
+        }
 
 	sdhci_set_power(host, ios->power_mode, ios->vdd);
 
@@ -2711,6 +2727,13 @@ static void sdhci_disable_irq_wakeups(struct sdhci_host *host)
 
 int sdhci_suspend_host(struct sdhci_host *host)
 {
+	struct mmc_host *mmc;
+        mmc = host->mmc;
+        char *var = "mmc2";
+        char *var2 = mmc_hostname(mmc);
+        
+        if(memcmp((char *)var,var2,5)){
+
 	sdhci_disable_card_detection(host);
 
 	if (host->tuning_mode == SDHCI_TUNING_MODE_1) {
@@ -2727,6 +2750,7 @@ int sdhci_suspend_host(struct sdhci_host *host)
 		sdhci_enable_irq_wakeups(host);
 		enable_irq_wake(host->irq);
 	}
+	}
 	return 0;
 }
 
@@ -2734,6 +2758,12 @@ EXPORT_SYMBOL_GPL(sdhci_suspend_host);
 
 int sdhci_resume_host(struct sdhci_host *host)
 {
+	struct mmc_host *mmc;
+        mmc = host->mmc;
+        char *var = "mmc2";
+        char *var2 = mmc_hostname(mmc);
+        
+        if(memcmp((char *)var,var2,5)){
 	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
 		if (host->ops->enable_dma)
 			host->ops->enable_dma(host);
@@ -2759,7 +2789,7 @@ int sdhci_resume_host(struct sdhci_host *host)
 	}
 
 	sdhci_enable_card_detection(host);
-
+	}
 	return 0;
 }
 
